@@ -4,7 +4,7 @@ module.exports.sync = writeFileSync
 module.exports._getTmpname = getTmpname // for testing
 module.exports._cleanupOnExit = cleanupOnExit
 
-const fs = require('fs')
+const _fs = require('fs')
 const MurmurHash3 = require('imurmurhash')
 const onExit = require('signal-exit')
 const path = require('path')
@@ -37,7 +37,7 @@ function getTmpname (filename) {
       .result()
 }
 
-function cleanupOnExit (tmpfile) {
+function cleanupOnExit (tmpfile, fs = _fs) {
   return () => {
     try {
       fs.unlinkSync(typeof tmpfile === 'function' ? tmpfile() : tmpfile)
@@ -75,11 +75,13 @@ async function writeFileAsync (filename, data, options = {}) {
   if (typeof options === 'string') {
     options = { encoding: options }
   }
+  options = Object.assign({ fs: _fs }, options)
 
+  const { fs } = options
   let fd
   let tmpfile
   /* istanbul ignore next -- The closure only gets called when onExit triggers */
-  const removeOnExitHandler = onExit(cleanupOnExit(() => tmpfile))
+  const removeOnExitHandler = onExit(cleanupOnExit(() => tmpfile), fs)
   const absoluteName = path.resolve(filename)
 
   try {
@@ -172,6 +174,10 @@ function writeFile (filename, data, options, callback) {
 function writeFileSync (filename, data, options) {
   if (typeof options === 'string') options = { encoding: options }
   else if (!options) options = {}
+  options = Object.assign({ fs: _fs }, options)
+
+  const { fs } = options
+
   try {
     filename = fs.realpathSync(filename)
   } catch (ex) {
@@ -197,7 +203,7 @@ function writeFileSync (filename, data, options) {
   }
 
   let fd
-  const cleanup = cleanupOnExit(tmpfile)
+  const cleanup = cleanupOnExit(tmpfile, fs)
   const removeOnExitHandler = onExit(cleanup)
 
   let threw = true
